@@ -152,22 +152,66 @@ export default function Home() {
 }
 
 function UnauthorizedState() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await shivaiDrive.supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="h-screen w-full flex items-center justify-center bg-[#050505] p-6 text-center">
-       <div className="max-w-md">
-          <div className="w-24 h-24 bg-red-500/10 rounded-[2.5rem] border border-red-500/20 flex items-center justify-center mx-auto mb-10">
-             <Lock className="text-red-500" size={40} />
+       <div className="max-w-md w-full">
+          <div className="w-20 h-24 bg-blue-500/10 rounded-[2.5rem] border border-blue-500/20 flex items-center justify-center mx-auto mb-8">
+             <ShieldCheck className="text-blue-500" size={40} />
           </div>
           <h1 className="text-3xl font-black italic uppercase tracking-tighter mb-4">Neural Connection Offline</h1>
-          <p className="text-gray-500 text-sm mb-12 leading-relaxed font-medium uppercase tracking-widest">
-             ShivAI Identity synchronization required to access neural memory.
+          <p className="text-gray-500 text-xs mb-10 leading-relaxed font-bold uppercase tracking-[0.2em]">
+             Authentication required to access neural memory hub.
           </p>
-          <button 
-            onClick={() => window.location.href = '/'}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-blue-600/20 active:scale-95"
-          >
-             Return to Gateway
-          </button>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input 
+              type="email" 
+              placeholder="IDENTITY EMAIL" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-bold placeholder:text-gray-600 focus:outline-none focus:border-blue-500 transition-all text-xs tracking-widest"
+              required
+            />
+            <input 
+              type="password" 
+              placeholder="IDENTITY PASSWORD" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-bold placeholder:text-gray-600 focus:outline-none focus:border-blue-500 transition-all text-xs tracking-widest"
+              required
+            />
+            <button 
+              disabled={loading}
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-blue-600/20 active:scale-95 text-xs"
+            >
+               {loading ? 'Synchronizing...' : 'Initialize Connection'}
+            </button>
+          </form>
+          
+          <div className="mt-8 pt-8 border-t border-white/5">
+             <p className="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">
+                Secure Tunnel via Supabase Root
+             </p>
+          </div>
        </div>
     </div>
   );
