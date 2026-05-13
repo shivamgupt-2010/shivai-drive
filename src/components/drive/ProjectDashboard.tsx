@@ -3,10 +3,16 @@
 import { motion } from 'framer-motion';
 import { LayoutGrid, CheckCircle, ArrowRight, Target, Activity } from 'lucide-react';
 
-export default function ProjectDashboard({ project }: { project: any }) {
+export default function ProjectDashboard({ project, onGenerate }: { project: any, onRefresh?: () => void, onGenerate?: () => void }) {
   if (!project) return (
-    <div className="h-64 flex items-center justify-center border-2 border-dashed border-white/5 rounded-[3rem]">
-       <p className="text-gray-600 text-sm font-black uppercase tracking-widest">No Active Project Workspace</p>
+    <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[3rem] p-10 text-center">
+       <p className="text-gray-600 text-sm font-black uppercase tracking-widest mb-6">No Active Project Workspace</p>
+       <button 
+         onClick={onGenerate}
+         className="px-8 py-4 bg-white/5 border border-white/10 hover:bg-blue-600 hover:border-blue-500 transition-all rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-white"
+       >
+          Initialize Workspace Intelligence
+       </button>
     </div>
   );
 

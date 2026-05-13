@@ -115,6 +115,27 @@ export class ShivAIDriveSDK {
     return dbFile;
   }
 
+  async deleteFile(fileId: string): Promise<void> {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Unauthorized');
+
+    // Get file info first
+    const { data: file } = await this.supabase
+      .from('drive_files')
+      .select('metadata')
+      .eq('id', fileId)
+      .single();
+
+    if (file?.metadata?.path) {
+      await this.supabase.storage.from('drive').remove([file.metadata.path]);
+    }
+
+    await this.supabase.from('drive_files').delete().eq('id', fileId);
+    
+    // Cleanup AI memory too
+    await this.supabase.from('ai_memory').delete().eq('metadata->>fileId', fileId);
+  }
+
   async getFiles(folderId?: string): Promise<DriveFile[]> {
     const user = await this.getCurrentUser();
     if (!user) return [];
@@ -153,6 +174,22 @@ export class ShivAIDriveSDK {
     return data || [];
   }
 
+  async deepScan(): Promise<void> {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Unauthorized');
+
+    const { data: files } = await this.supabase
+      .from('drive_files')
+      .select('id')
+      .eq('user_id', user.id);
+
+    if (files) {
+      for (const file of files) {
+        await this.processNeuralMetadata(file.id);
+      }
+    }
+  }
+
   async createFolder(name: string, parentId?: string, isVault: boolean = false): Promise<DriveFolder> {
     const user = await this.getCurrentUser();
     if (!user) throw new Error('Unauthorized');
@@ -179,7 +216,7 @@ export class ShivAIDriveSDK {
 
     try {
         // Call the AI Orchestrator
-        await axios.post('http://localhost:3001/process-file', {
+        await axios.post('http://localhost:4000/process-file', {
             fileId,
             userId: user.id
         });
@@ -193,7 +230,7 @@ export class ShivAIDriveSDK {
     if (!user) return [];
 
     try {
-        const response = await axios.post('http://localhost:3001/search', {
+        const response = await axios.post('http://localhost:4000/search', {
             query,
             userId: user.id
         });
@@ -222,7 +259,7 @@ export class ShivAIDriveSDK {
     const user = await this.getCurrentUser();
     if (!user) return null;
 
-    const response = await axios.post('http://localhost:3001/generate-workspace', {
+    const response = await axios.post('http://localhost:4000/generate-workspace', {
         folderId,
         userId: user.id
     });

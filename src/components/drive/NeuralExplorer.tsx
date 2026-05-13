@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Brain, Activity, Zap, Cpu, Network } from 'lucide-react';
 
-export default function NeuralExplorer({ stats }: { stats: any }) {
+export default function NeuralExplorer({ stats, insights, onRefresh }: { stats: any, insights: any[], onRefresh: () => void }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
       {/* Neural Connectivity Graph (Visual) */}
@@ -42,9 +42,9 @@ export default function NeuralExplorer({ stats }: { stats: any }) {
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-auto">
-               <StatCard label="Patterns" value="4.2k" icon={<Network size={14} />} />
-               <StatCard label="Cognition" value="Stable" icon={<Activity size={14} />} />
-               <StatCard label="Sync Delay" value="12ms" icon={<Zap size={14} />} />
+               <StatCard label="Patterns" value={stats.patterns} icon={<Network size={14} />} />
+               <StatCard label="Cognition" value={stats.cognition} icon={<Activity size={14} />} />
+               <StatCard label="Memory Load" value={stats.totalSize} icon={<Zap size={14} />} />
             </div>
          </div>
       </div>
@@ -54,12 +54,22 @@ export default function NeuralExplorer({ stats }: { stats: any }) {
          <h3 className="text-sm font-black text-white uppercase tracking-[0.3em] mb-8 italic">AI Memory Insights</h3>
          
          <div className="space-y-6 flex-1">
-            <InsightItem label="Most Relevant" value="Q4 Finance Report" status="High" />
-            <InsightItem label="Neural Group" value="Development Assets" status="Auto" />
-            <InsightItem label="Privacy Level" value="Sovereign" status="Max" />
+            {insights.length > 0 ? insights.map((insight, i) => (
+                <InsightItem 
+                  key={i} 
+                  label={insight.insight_type.replace('_', ' ')} 
+                  value={typeof insight.content === 'string' && insight.content.startsWith('{') ? JSON.parse(insight.content).name : insight.content} 
+                  status={`${Math.round(insight.confidence * 100)}%`} 
+                />
+            )) : (
+              <p className="text-gray-600 text-[10px] font-bold uppercase text-center mt-20">No neural insights detected yet.</p>
+            )}
          </div>
 
-         <button className="w-full mt-8 bg-white/5 border border-white/10 hover:bg-blue-600 hover:border-blue-500 transition-all py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-white">
+         <button 
+           onClick={onRefresh}
+           className="w-full mt-8 bg-white/5 border border-white/10 hover:bg-blue-600 hover:border-blue-500 transition-all py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-white"
+         >
             Trigger Deep scan
          </button>
       </div>

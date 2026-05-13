@@ -17,7 +17,36 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [viewers, setViewers] = useState<any[]>([]);
   const [project, setProject] = useState<any>(null);
+  const [stats, setStats] = useState<any>({ patterns: 0, cognition: 'Stable', syncDelay: '12ms', totalSize: '0 MB' });
+  const [insights, setInsights] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchStats = async (userId: string) => {
+    const { data: files } = await shivaiDrive.supabase
+      .from('drive_files')
+      .select('size, ai_summary')
+      .eq('user_id', userId);
+    
+    if (files) {
+      const totalSize = files.reduce((acc, f) => acc + (f.size || 0), 0);
+      const processedCount = files.filter(f => f.ai_summary).length;
+      setStats({
+        patterns: processedCount * 5, // Mocking patterns based on tags
+        cognition: processedCount > 0 ? 'Enhanced' : 'Baseline',
+        syncDelay: '12ms',
+        totalSize: `${(totalSize / (1024 * 1024)).toFixed(1)} MB`
+      });
+    }
+
+    const { data: aiInsights } = await shivaiDrive.supabase
+      .from('ai_insights')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(3);
+    
+    if (aiInsights) setInsights(aiInsights);
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -27,6 +56,7 @@ export default function Home() {
         setUser({ ...u, ...p });
         const f = await shivaiDrive.getFiles();
         setFiles(f);
+        fetchStats(u.id);
 
         // Fetch active project if exists
         const { data: insight } = await shivaiDrive.supabase
@@ -90,9 +120,48 @@ export default function Home() {
       await shivaiDrive.uploadFile(file);
       const f = await shivaiDrive.getFiles();
       setFiles(f);
-    } catch (err) {
+      if (user) fetchStats(user.id);
+    } catch (err: any) {
       console.error(err);
-      alert('Upload failed. Ensure Supabase Storage bucket "drive" exists.');
+      alert(`Upload failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await shivaiDrive.deleteFile(id);
+      setFiles(prev => prev.filter(f => f.id !== id));
+      if (user) fetchStats(user.id);
+    } catch (err: any) {
+      alert(`Delete failed: ${err.message}`);
+    }
+  };
+
+  const handleDeepScan = async () => {
+    setLoading(true);
+    try {
+      await shivaiDrive.deepScan();
+      const f = await shivaiDrive.getFiles();
+      setFiles(f);
+      if (user) fetchStats(user.id);
+      alert('Deep scan initiated. Neural patterns are being indexed.');
+    } catch (err: any) {
+      alert(`Scan failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateWorkspace = async () => {
+    setLoading(true);
+    try {
+      const config = await shivaiDrive.generateProjectWorkspace('root'); // Using 'root' as placeholder
+      setProject(config);
+      alert('Workspace intelligence initialized.');
+    } catch (err: any) {
+      alert(`Generation failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -134,11 +203,11 @@ export default function Home() {
            </div>
 
            {activeTab === 'neural' ? (
-             <NeuralExplorer stats={{}} />
+             <NeuralExplorer stats={stats} insights={insights} onRefresh={handleDeepScan} />
            ) : activeTab === 'projects' ? (
-             <ProjectDashboard project={project} />
+             <ProjectDashboard project={project} onGenerate={handleGenerateWorkspace} />
            ) : (
-             <FileGrid files={files} loading={loading} />
+             <FileGrid files={files} loading={loading} onDelete={handleDelete} />
            )}
         </div>
       </div>

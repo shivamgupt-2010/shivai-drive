@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { DriveFile } from '@/lib/sdk';
 
-export default function FileGrid({ files, loading }: { files: DriveFile[], loading: boolean }) {
+export default function FileGrid({ files, loading, onDelete }: { files: DriveFile[], loading: boolean, onDelete: (id: string) => void }) {
   if (loading) return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
        {[1,2,3,4,5,6,7,8].map(i => (
@@ -32,12 +32,15 @@ export default function FileGrid({ files, loading }: { files: DriveFile[], loadi
               <div className="w-12 h-12 bg-[#050505]/60 rounded-2xl flex items-center justify-center border border-white/10 group-hover:border-blue-500/30 transition-all">
                  <FileIcon type={file.type} />
               </div>
-              <button className="p-2 text-gray-500 hover:text-white transition-colors">
-                <MoreVertical size={18} />
+              <button 
+                onClick={(e) => { e.stopPropagation(); if(confirm('Delete permanently?')) onDelete(file.id); }}
+                className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+              >
+                <Trash2 size={18} />
               </button>
            </div>
 
-           <div className="relative z-10">
+           <div className="relative z-10" onClick={() => window.open(file.url, '_blank')}>
               <h3 className="text-sm font-black text-white truncate mb-1 group-hover:text-blue-400 transition-colors">{file.name}</h3>
               <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">
                 {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type.split('/')[1]?.toUpperCase() || 'FILE'}
@@ -46,16 +49,24 @@ export default function FileGrid({ files, loading }: { files: DriveFile[], loadi
 
            <div className="mt-6 flex items-center justify-between relative z-10">
               <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" />
-                 <span className="text-[9px] font-black uppercase text-blue-400 tracking-[0.2em]">Neural Synced</span>
+                 <div className={`w-2 h-2 rounded-full ${file.ai_summary ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6]' : 'bg-gray-600'}`} />
+                 <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${file.ai_summary ? 'text-blue-400' : 'text-gray-600'}`}>
+                    {file.ai_summary ? 'Neural Indexed' : 'Pending Sync'}
+                 </span>
               </div>
               {file.is_encrypted && <Shield size={14} className="text-emerald-500" />}
            </div>
 
            {/* Quick Actions Overlay */}
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-4 group-hover:translate-y-0 scale-90 group-hover:scale-100 z-20">
-              <ActionButton icon={<Download size={16} />} label="GET" />
-              <ActionButton icon={<Share2 size={16} />} label="SHARE" />
+              <a href={file.url} download target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                <ActionButton icon={<Download size={16} />} label="GET" />
+              </a>
+              <ActionButton icon={<Share2 size={16} />} label="SHARE" onClick={(e: any) => {
+                 e.stopPropagation();
+                 navigator.clipboard.writeText(file.url);
+                 alert('Neural link copied to clipboard.');
+              }} />
            </div>
          </motion.div>
        ))}
