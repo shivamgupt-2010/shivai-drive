@@ -1,0 +1,216 @@
+import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-js';
+
+/**
+ * PRODUCTION-GRADE SHIVAI DRIVE SDK (PGS-1)
+ * Version: 1.0.0-DRIVE
+ * Inherits from ShivAI Core Identity
+ */
+
+export interface ShivAIProfile {
+  id: string;
+  username: string;
+  full_name: string;
+  avatar_url?: string;
+  identity_strength: number;
+  trust_score: number;
+  behavior_score: number;
+  status: 'active' | 'suspended' | 'lockdown';
+  is_verified: boolean;
+  metadata: Record<string, any>;
+}
+
+export interface DriveFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+  created_at: string;
+  folder_id?: string;
+  ai_summary?: string;
+  ai_tags?: string[];
+  importance_score?: number;
+  is_encrypted: boolean;
+  metadata?: any;
+}
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  parent_id?: string;
+  created_at: string;
+  is_vault: boolean;
+}
+
+export class ShivAIDriveSDK {
+  private static instance: ShivAIDriveSDK;
+  public supabase: SupabaseClient;
+
+  private constructor(url: string, key: string) {
+    this.supabase = createClient(url, key);
+  }
+
+  public static getInstance(url: string, key: string): ShivAIDriveSDK {
+    if (!ShivAIDriveSDK.instance) {
+      ShivAIDriveSDK.instance = new ShivAIDriveSDK(url, key);
+    }
+    return ShivAIDriveSDK.instance;
+  }
+
+  // AUTH (Synced with Identity)
+  async getCurrentUser(): Promise<User | null> {
+    const { data: { user } } = await this.supabase.auth.getUser();
+    return user;
+  }
+
+  async getProfile(userId: string): Promise<ShivAIProfile | null> {
+    const { data, error } = await this.supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (error) return null;
+    return data as ShivAIProfile;
+  }
+
+  // STORAGE CORE
+  async uploadFile(file: File, folderId?: string): Promise<DriveFile | null> {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Unauthorized');
+
+    const fileName = `${Date.now()}-${file.name}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    const { data: storageData, error: storageError } = await this.supabase.storage
+      .from('drive')
+      .upload(filePath, file);
+
+    if (storageError) throw storageError;
+
+    const { data: { publicUrl } } = this.supabase.storage
+      .from('drive')
+      .getPublicUrl(filePath);
+
+    // Register in DB
+    const { data: dbFile, error: dbError } = await this.supabase
+      .from('drive_files')
+      .insert({
+        user_id: user.id,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: publicUrl,
+        folder_id: folderId,
+        metadata: { path: filePath }
+      })
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+
+    // Trigger AI Processing (Mock for now, will be Edge Function)
+    this.processNeuralMetadata(dbFile.id);
+
+    return dbFile;
+  }
+
+  async getFiles(folderId?: string): Promise<DriveFile[]> {
+    const user = await this.getCurrentUser();
+    if (!user) return [];
+
+    let query = this.supabase
+      .from('drive_files')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (folderId) {
+      query = query.eq('folder_id', folderId);
+    } else {
+      query = query.is('folder_id', null);
+    }
+
+    const { data } = await query.order('created_at', { ascending: false });
+    return data || [];
+  }
+
+  async getFolders(parentId?: string): Promise<DriveFolder[]> {
+    const user = await this.getCurrentUser();
+    if (!user) return [];
+
+    let query = this.supabase
+      .from('drive_folders')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (parentId) {
+      query = query.eq('parent_id', parentId);
+    } else {
+      query = query.is('parent_id', null);
+    }
+
+    const { data } = await query.order('name');
+    return data || [];
+  }
+
+  async createFolder(name: string, parentId?: string, isVault: boolean = false): Promise<DriveFolder> {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Unauthorized');
+
+    const { data, error } = await this.supabase
+      .from('drive_folders')
+      .insert({
+        user_id: user.id,
+        name,
+        parent_id: parentId,
+        is_vault: isVault
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  // NEURAL INTELLIGENCE
+  private async processNeuralMetadata(fileId: string) {
+    // This would typically call a Supabase Edge Function to process via OpenAI
+    console.log(`Neural processing started for file: ${fileId}`);
+    
+    // Simulate AI Tagging
+    setTimeout(async () => {
+        await this.supabase.from('drive_files').update({
+            ai_summary: "Processed by ShivAI Neural Engine. Context extracted.",
+            ai_tags: ["AI-Analyzed", "Ecosystem-Synced"],
+            importance_score: 85
+        }).eq('id', fileId);
+    }, 2000);
+  }
+
+  async searchFiles(query: string): Promise<DriveFile[]> {
+    const user = await this.getCurrentUser();
+    if (!user) return [];
+
+    const { data } = await this.supabase
+      .from('drive_files')
+      .select('*')
+      .eq('user_id', user.id)
+      .or(`name.ilike.%${query}%,ai_summary.ilike.%${query}%`);
+    
+    return data || [];
+  }
+
+  onAuthStateChange(callback: (session: Session | null) => void) {
+    return this.supabase.auth.onAuthStateChange((_event, session) => {
+      callback(session);
+    });
+  }
+
+  async logout() {
+    await this.supabase.auth.signOut();
+  }
+}
+
+export const shivaiDrive = ShivAIDriveSDK.getInstance(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
