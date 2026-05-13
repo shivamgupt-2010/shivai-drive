@@ -204,6 +204,20 @@ export class ShivAIDriveSDK {
     }
   }
 
+  async searchFiles(query: string): Promise<DriveFile[]> {
+    const user = await this.getCurrentUser();
+    if (!user) return [];
+
+    const { data } = await this.supabase
+      .from('drive_files')
+      .select('*')
+      .eq('user_id', user.id)
+      .ilike('name', `%${query}%`)
+      .order('created_at', { ascending: false });
+
+    return data || [];
+  }
+
   async generateProjectWorkspace(folderId: string): Promise<any> {
     const user = await this.getCurrentUser();
     if (!user) return null;
