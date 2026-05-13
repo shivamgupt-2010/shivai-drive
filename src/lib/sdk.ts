@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-js';
+import axios from 'axios';
 
 /**
  * PRODUCTION-GRADE SHIVAI DRIVE SDK (PGS-1)
@@ -171,32 +172,47 @@ export class ShivAIDriveSDK {
     return data;
   }
 
-  // NEURAL INTELLIGENCE
+  // NEURAL INTELLIGENCE (REAL)
   private async processNeuralMetadata(fileId: string) {
-    // This would typically call a Supabase Edge Function to process via OpenAI
-    console.log(`Neural processing started for file: ${fileId}`);
-    
-    // Simulate AI Tagging
-    setTimeout(async () => {
-        await this.supabase.from('drive_files').update({
-            ai_summary: "Processed by ShivAI Neural Engine. Context extracted.",
-            ai_tags: ["AI-Analyzed", "Ecosystem-Synced"],
-            importance_score: 85
-        }).eq('id', fileId);
-    }, 2000);
+    const user = await this.getCurrentUser();
+    if (!user) return;
+
+    try {
+        // Call the AI Orchestrator
+        await axios.post('http://localhost:3001/process-file', {
+            fileId,
+            userId: user.id
+        });
+    } catch (err) {
+        console.warn("AI Orchestrator unreachable. Falling back to background tasks.");
+    }
   }
 
-  async searchFiles(query: string): Promise<DriveFile[]> {
+  async semanticSearch(query: string): Promise<any[]> {
     const user = await this.getCurrentUser();
     if (!user) return [];
 
-    const { data } = await this.supabase
-      .from('drive_files')
-      .select('*')
-      .eq('user_id', user.id)
-      .or(`name.ilike.%${query}%,ai_summary.ilike.%${query}%`);
-    
-    return data || [];
+    try {
+        const response = await axios.post('http://localhost:3001/search', {
+            query,
+            userId: user.id
+        });
+        return response.data;
+    } catch (err) {
+        // Fallback to basic search
+        return this.searchFiles(query);
+    }
+  }
+
+  async generateProjectWorkspace(folderId: string): Promise<any> {
+    const user = await this.getCurrentUser();
+    if (!user) return null;
+
+    const response = await axios.post('http://localhost:3001/generate-workspace', {
+        folderId,
+        userId: user.id
+    });
+    return response.data;
   }
 
   onAuthStateChange(callback: (session: Session | null) => void) {

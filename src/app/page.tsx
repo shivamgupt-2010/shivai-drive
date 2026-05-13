@@ -7,6 +7,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
 import NeuralExplorer from '@/components/drive/NeuralExplorer';
 import FileGrid from '@/components/drive/FileGrid';
+import ProjectDashboard from '@/components/drive/ProjectDashboard';
 import { Cloud, Lock, ShieldCheck, Zap } from 'lucide-react';
 
 export default function Home() {
@@ -14,6 +15,8 @@ export default function Home() {
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [viewers, setViewers] = useState<any[]>([]);
+  const [project, setProject] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -24,6 +27,31 @@ export default function Home() {
         setUser({ ...u, ...p });
         const f = await shivaiDrive.getFiles();
         setFiles(f);
+
+        // Fetch active project if exists
+        const { data: insight } = await shivaiDrive.supabase
+          .from('ai_insights')
+          .select('*')
+          .eq('user_id', u.id)
+          .eq('insight_type', 'project_config')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (insight) setProject(JSON.parse(insight.content));
+
+        // Real-time Collaboration (Presence)
+        const channel = shivaiDrive.supabase.channel('drive_presence');
+        channel
+          .on('presence', { event: 'sync' }, () => {
+            const state = channel.presenceState();
+            const active = Object.values(state).flat();
+            setViewers(active);
+          })
+          .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+              await channel.track({ user: p?.username || u.email, online_at: new Date().toISOString() });
+            }
+          });
       }
       setLoading(false);
     };
@@ -40,6 +68,18 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const handleSearch = async (query: string) => {
+    if (!query) {
+        const f = await shivaiDrive.getFiles();
+        setFiles(f);
+        return;
+    }
+    setLoading(true);
+    const results = await shivaiDrive.semanticSearch(query);
+    setFiles(results as any);
+    setLoading(false);
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,7 +105,12 @@ export default function Home() {
       <Sidebar active={activeTab} onChange={setActiveTab} />
       
       <div className="flex-1 ml-72">
-        <TopBar user={user} onUpload={() => fileInputRef.current?.click()} />
+        <TopBar 
+          user={user} 
+          onUpload={() => fileInputRef.current?.click()} 
+          onSearch={handleSearch}
+          viewers={viewers}
+        />
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -90,6 +135,8 @@ export default function Home() {
 
            {activeTab === 'neural' ? (
              <NeuralExplorer stats={{}} />
+           ) : activeTab === 'projects' ? (
+             <ProjectDashboard project={project} />
            ) : (
              <FileGrid files={files} loading={loading} />
            )}

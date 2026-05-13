@@ -10,6 +10,7 @@ import {
 export default function Sidebar({ active, onChange }: { active: string, onChange: (v: string) => void }) {
   const menuItems = [
     { id: 'drive', label: 'My Space', icon: HardDrive },
+    { id: 'projects', label: 'Projects', icon: LayoutGrid },
     { id: 'neural', label: 'Neural Index', icon: Brain },
     { id: 'shared', label: 'Ecosystem Sync', icon: Share2 },
     { id: 'vault', label: 'Secure Vault', icon: Shield },
