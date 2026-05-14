@@ -215,8 +215,9 @@ export class ShivAIDriveSDK {
     if (!user) return;
 
     try {
+        const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://shivai-orchestrator.vercel.app';
         // Call the AI Orchestrator
-        await axios.post('http://localhost:4000/process-file', {
+        await axios.post(`${orchestratorUrl}/process-file`, {
             fileId,
             userId: user.id
         });
@@ -230,7 +231,8 @@ export class ShivAIDriveSDK {
     if (!user) return [];
 
     try {
-        const response = await axios.post('http://localhost:4000/search', {
+        const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://shivai-orchestrator.vercel.app';
+        const response = await axios.post(`${orchestratorUrl}/search`, {
             query,
             userId: user.id
         });
@@ -259,7 +261,8 @@ export class ShivAIDriveSDK {
     const user = await this.getCurrentUser();
     if (!user) return null;
 
-    const response = await axios.post('http://localhost:4000/generate-workspace', {
+    const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://shivai-orchestrator.vercel.app';
+    const response = await axios.post(`${orchestratorUrl}/generate-workspace`, {
         folderId,
         userId: user.id
     });
