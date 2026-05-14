@@ -32,6 +32,8 @@ export interface DriveFile {
   ai_tags?: string[];
   importance_score?: number;
   is_encrypted: boolean;
+  is_deleted: boolean;
+  is_shared: boolean;
   metadata?: any;
 }
 
