@@ -24,14 +24,17 @@ export default function Home() {
   const fetchStats = async (userId: string) => {
     const { data: files } = await shivaiDrive.supabase
       .from('drive_files')
-      .select('size, ai_summary')
-      .eq('user_id', userId);
+      .select('size, ai_summary, ai_tags')
+      .eq('user_id', userId)
+      .eq('is_deleted', false);
     
     if (files) {
       const totalSize = files.reduce((acc, f) => acc + (f.size || 0), 0);
       const processedCount = files.filter(f => f.ai_summary).length;
+      const totalTags = files.reduce((acc, f) => acc + (f.ai_tags?.length || 0), 0);
+      
       setStats({
-        patterns: processedCount * 5, // Mocking patterns based on tags
+        patterns: totalTags + (processedCount * 2), 
         cognition: processedCount > 0 ? 'Enhanced' : 'Baseline',
         syncDelay: '12ms',
         totalSize: `${(totalSize / (1024 * 1024)).toFixed(1)} MB`
@@ -48,14 +51,27 @@ export default function Home() {
     if (aiInsights) setInsights(aiInsights);
   };
 
+  const fetchFiles = async (tab: string) => {
+    setLoading(true);
+    let filter: 'all' | 'shared' | 'trash' = 'all';
+    if (tab === 'trash') filter = 'trash';
+    if (tab === 'shared') filter = 'shared';
+    
+    const f = await shivaiDrive.getFiles(undefined, filter);
+    setFiles(f);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchFiles(activeTab);
+  }, [activeTab]);
+
   useEffect(() => {
     const init = async () => {
       const u = await shivaiDrive.getCurrentUser();
       if (u) {
         const p = await shivaiDrive.getProfile(u.id);
         setUser({ ...u, ...p });
-        const f = await shivaiDrive.getFiles();
-        setFiles(f);
         fetchStats(u.id);
 
         // Fetch active project if exists
@@ -101,8 +117,7 @@ export default function Home() {
 
   const handleSearch = async (query: string) => {
     if (!query) {
-        const f = await shivaiDrive.getFiles();
-        setFiles(f);
+        fetchFiles(activeTab);
         return;
     }
     setLoading(true);
@@ -118,8 +133,7 @@ export default function Home() {
     setLoading(true);
     try {
       await shivaiDrive.uploadFile(file);
-      const f = await shivaiDrive.getFiles();
-      setFiles(f);
+      fetchFiles(activeTab);
       if (user) fetchStats(user.id);
     } catch (err: any) {
       console.error(err);
@@ -131,11 +145,36 @@ export default function Home() {
 
   const handleDelete = async (id: string) => {
     try {
-      await shivaiDrive.deleteFile(id);
-      setFiles(prev => prev.filter(f => f.id !== id));
+      if (activeTab === 'trash') {
+        if (confirm('Permanently delete this neural asset?')) {
+          await shivaiDrive.permanentlyDeleteFile(id);
+        }
+      } else {
+        await shivaiDrive.deleteFile(id);
+      }
+      fetchFiles(activeTab);
       if (user) fetchStats(user.id);
     } catch (err: any) {
-      alert(`Delete failed: ${err.message}`);
+      alert(`Operation failed: ${err.message}`);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    try {
+      await shivaiDrive.restoreFile(id);
+      fetchFiles(activeTab);
+    } catch (err: any) {
+      alert(`Restore failed: ${err.message}`);
+    }
+  };
+
+  const handleShare = async (id: string, status: boolean) => {
+    try {
+      await shivaiDrive.shareFile(id, status);
+      fetchFiles(activeTab);
+      alert(status ? 'Neural link shared.' : 'Neural link revoked.');
+    } catch (err: any) {
+      alert(`Sharing failed: ${err.message}`);
     }
   };
 
@@ -143,8 +182,7 @@ export default function Home() {
     setLoading(true);
     try {
       await shivaiDrive.deepScan();
-      const f = await shivaiDrive.getFiles();
-      setFiles(f);
+      fetchFiles(activeTab);
       if (user) fetchStats(user.id);
       alert('Deep scan initiated. Neural patterns are being indexed.');
     } catch (err: any) {
@@ -157,11 +195,12 @@ export default function Home() {
   const handleGenerateWorkspace = async () => {
     setLoading(true);
     try {
-      const config = await shivaiDrive.generateProjectWorkspace('root'); // Using 'root' as placeholder
+      const config = await shivaiDrive.generateProjectWorkspace('root'); 
       setProject(config);
       alert('Workspace intelligence initialized.');
     } catch (err: any) {
-      alert(`Generation failed: ${err.message}`);
+      console.error(err);
+      alert(`Generation failed: ${err.response?.data?.error || err.message}`);
     } finally {
       setLoading(false);
     }
@@ -194,7 +233,9 @@ export default function Home() {
                  <h2 className="text-4xl font-black italic uppercase tracking-tighter mb-2">
                     {activeTab === 'drive' ? 'My Space' : 
                      activeTab === 'neural' ? 'Neural Index' : 
-                     activeTab === 'vault' ? 'Secure Vault' : activeTab}
+                     activeTab === 'vault' ? 'Secure Vault' : 
+                     activeTab === 'trash' ? 'Neural Waste' :
+                     activeTab === 'shared' ? 'Shared Intelligence' : activeTab}
                  </h2>
                  <p className="text-xs font-bold text-gray-500 uppercase tracking-[0.3em]">
                     {files.length} Intelligent Assets • Memory Health: Optimal
@@ -207,7 +248,14 @@ export default function Home() {
            ) : activeTab === 'projects' ? (
              <ProjectDashboard project={project} onGenerate={handleGenerateWorkspace} />
            ) : (
-             <FileGrid files={files} loading={loading} onDelete={handleDelete} />
+             <FileGrid 
+                files={files} 
+                loading={loading} 
+                onDelete={handleDelete} 
+                onRestore={handleRestore}
+                onShare={handleShare}
+                isTrash={activeTab === 'trash'}
+             />
            )}
         </div>
       </div>

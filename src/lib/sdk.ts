@@ -102,6 +102,8 @@ export class ShivAIDriveSDK {
         type: file.type,
         url: publicUrl,
         folder_id: folderId,
+        is_deleted: false,
+        is_shared: false,
         metadata: { path: filePath }
       })
       .select()
@@ -109,17 +111,31 @@ export class ShivAIDriveSDK {
 
     if (dbError) throw dbError;
 
-    // Trigger AI Processing (Mock for now, will be Edge Function)
+    // Trigger AI Processing
     this.processNeuralMetadata(dbFile.id);
 
     return dbFile;
   }
 
+  // SOFT DELETE & RESTORE
   async deleteFile(fileId: string): Promise<void> {
+    await this.supabase
+      .from('drive_files')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('id', fileId);
+  }
+
+  async restoreFile(fileId: string): Promise<void> {
+    await this.supabase
+      .from('drive_files')
+      .update({ is_deleted: false, updated_at: new Date().toISOString() })
+      .eq('id', fileId);
+  }
+
+  async permanentlyDeleteFile(fileId: string): Promise<void> {
     const user = await this.getCurrentUser();
     if (!user) throw new Error('Unauthorized');
 
-    // Get file info first
     const { data: file } = await this.supabase
       .from('drive_files')
       .select('metadata')
@@ -131,12 +147,18 @@ export class ShivAIDriveSDK {
     }
 
     await this.supabase.from('drive_files').delete().eq('id', fileId);
-    
-    // Cleanup AI memory too
     await this.supabase.from('ai_memory').delete().eq('metadata->>fileId', fileId);
   }
 
-  async getFiles(folderId?: string): Promise<DriveFile[]> {
+  // SHARING
+  async shareFile(fileId: string, status: boolean = true): Promise<void> {
+    await this.supabase
+      .from('drive_files')
+      .update({ is_shared: status, updated_at: new Date().toISOString() })
+      .eq('id', fileId);
+  }
+
+  async getFiles(folderId?: string, filter: 'all' | 'shared' | 'trash' = 'all'): Promise<DriveFile[]> {
     const user = await this.getCurrentUser();
     if (!user) return [];
 
@@ -145,10 +167,17 @@ export class ShivAIDriveSDK {
       .select('*')
       .eq('user_id', user.id);
 
-    if (folderId) {
-      query = query.eq('folder_id', folderId);
+    if (filter === 'trash') {
+      query = query.eq('is_deleted', true);
+    } else if (filter === 'shared') {
+      query = query.eq('is_shared', true).eq('is_deleted', false);
     } else {
-      query = query.is('folder_id', null);
+      query = query.eq('is_deleted', false);
+      if (folderId) {
+        query = query.eq('folder_id', folderId);
+      } else {
+        query = query.is('folder_id', null);
+      }
     }
 
     const { data } = await query.order('created_at', { ascending: false });
