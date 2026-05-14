@@ -73,9 +73,9 @@ export default function FileGrid({
 
            <div className="mt-6 flex items-center justify-between relative z-10">
               <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${file.ai_summary ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6]' : 'bg-gray-600'}`} />
-                 <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${file.ai_summary ? 'text-blue-400' : 'text-gray-600'}`}>
-                    {file.ai_summary ? 'Neural Indexed' : 'Pending Sync'}
+                 <div className={`w-2 h-2 rounded-full ${file.ai_summary ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6]' : 'bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]'}`} />
+                 <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${file.ai_summary ? 'text-blue-400' : 'text-amber-500'}`}>
+                    {file.ai_summary ? 'Neural Indexed' : 'AI Analyzing...'}
                  </span>
               </div>
               <div className="flex gap-2">
