@@ -186,7 +186,7 @@ export class ShivAIDriveSDK {
     }
 
     await this.supabase.from('drive_files').delete().eq('id', fileId);
-    await this.supabase.from('ai_memory').delete().eq('metadata->>fileId', fileId);
+    await this.supabase.from('ai_memory').delete().eq('metadata->fileId', fileId);
   }
 
   // SHARING
