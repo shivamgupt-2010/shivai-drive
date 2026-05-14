@@ -7,15 +7,25 @@ import {
   Plus, Settings, LayoutGrid
 } from 'lucide-react';
 
-export default function Sidebar({ active, onChange }: { active: string, onChange: (v: string) => void }) {
+export default function Sidebar({ 
+  active, 
+  onChange, 
+  stats, 
+  onUpgrade 
+}: { 
+  active: string, 
+  onChange: (v: string) => void, 
+  stats?: any, 
+  onUpgrade?: () => void 
+}) {
   const menuItems = [
     { id: 'drive', label: 'My Space', icon: HardDrive },
     { id: 'projects', label: 'Projects', icon: LayoutGrid },
     { id: 'neural', label: 'Neural Index', icon: Brain },
     { id: 'shared', label: 'Ecosystem Sync', icon: Share2 },
     { id: 'vault', label: 'Secure Vault', icon: Shield },
-    { id: 'recent', label: 'Memory Stream', icon: Clock },
     { id: 'trash', label: 'Discarded', icon: Trash2 },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -30,7 +40,7 @@ export default function Sidebar({ active, onChange }: { active: string, onChange
         </div>
       </div>
 
-      <div className="flex-1 space-y-2">
+      <div className="flex-1 space-y-2 overflow-y-auto">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -47,27 +57,32 @@ export default function Sidebar({ active, onChange }: { active: string, onChange
         ))}
       </div>
 
-      <div className="mt-auto space-y-6">
+      <div className="mt-auto pt-6 space-y-6">
         {/* Storage Stats */}
         <div className="p-4 bg-white/5 rounded-3xl border border-white/10">
           <div className="flex justify-between items-center mb-3">
              <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest leading-none">Intelligence Cache</span>
-             <span className="text-[10px] font-black text-blue-400">12% Used</span>
+             <span className="text-[10px] font-black text-blue-400">{stats?.usedPercent?.toFixed(1) || 0}% Used</span>
           </div>
           <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
             <motion.div 
               initial={{ width: 0 }}
-              animate={{ width: '12%' }}
-              className="h-full bg-blue-500"
+              animate={{ width: `${stats?.usedPercent || 0}%` }}
+              className="h-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"
             />
           </div>
-          <p className="text-[9px] text-gray-600 mt-2 font-medium">Synced with Identity Hub</p>
+          <div className="flex justify-between items-center mt-2">
+            <p className="text-[8px] text-gray-600 font-bold uppercase tracking-widest">{stats?.totalSize || '0 MB'} Synced</p>
+            <p className="text-[8px] text-blue-500/50 font-black uppercase tracking-widest italic">{stats?.tier || 'Free'}</p>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between px-2">
-           <button className="p-2 text-gray-500 hover:text-white transition-colors"><Settings size={18} /></button>
-           <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors">
-              <Zap size={14} /> Upgrade AI
+        <div className="flex items-center justify-center px-2">
+           <button 
+             onClick={onUpgrade}
+             className="w-full py-4 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl hover:scale-105 transition-all shadow-lg shadow-blue-500/20"
+           >
+              <Zap size={14} className="fill-white" /> Upgrade AI
            </button>
         </div>
       </div>

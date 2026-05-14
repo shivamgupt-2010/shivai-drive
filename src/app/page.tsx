@@ -8,6 +8,9 @@ import TopBar from '@/components/layout/TopBar';
 import NeuralExplorer from '@/components/drive/NeuralExplorer';
 import FileGrid from '@/components/drive/FileGrid';
 import ProjectDashboard from '@/components/drive/ProjectDashboard';
+import UpgradeModal from '@/components/drive/UpgradeModal';
+import ShareModal from '@/components/drive/ShareModal';
+import SettingsView from '@/components/drive/SettingsView';
 import { Cloud, Lock, ShieldCheck, Zap } from 'lucide-react';
 
 export default function Home() {
@@ -17,11 +20,19 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [viewers, setViewers] = useState<any[]>([]);
   const [project, setProject] = useState<any>(null);
-  const [stats, setStats] = useState<any>({ patterns: 0, cognition: 'Stable', syncDelay: '12ms', totalSize: '0 MB' });
+  const [stats, setStats] = useState<any>({ patterns: 0, cognition: 'Stable', syncDelay: '12ms', totalSize: '0 MB', usedPercent: 0, tier: 'Free' });
   const [insights, setInsights] = useState<any[]>([]);
+  
+  // Modal states
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<DriveFile | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchStats = async (userId: string) => {
+    const usage = await shivaiDrive.getStorageUsage();
+    
     const { data: files } = await shivaiDrive.supabase
       .from('drive_files')
       .select('size, ai_summary, ai_tags')
@@ -29,7 +40,6 @@ export default function Home() {
       .eq('is_deleted', false);
     
     if (files) {
-      const totalSize = files.reduce((acc, f) => acc + (f.size || 0), 0);
       const processedCount = files.filter(f => f.ai_summary).length;
       const totalTags = files.reduce((acc, f) => acc + (f.ai_tags?.length || 0), 0);
       
@@ -37,7 +47,9 @@ export default function Home() {
         patterns: totalTags + (processedCount * 2), 
         cognition: processedCount > 0 ? 'Enhanced' : 'Baseline',
         syncDelay: '12ms',
-        totalSize: `${(totalSize / (1024 * 1024)).toFixed(1)} MB`
+        totalSize: `${(usage.used / (1024 * 1024)).toFixed(1)} MB`,
+        usedPercent: Math.min(100, (usage.used / usage.limit) * 100),
+        tier: usage.tier
       });
     }
 
@@ -169,12 +181,10 @@ export default function Home() {
   };
 
   const handleShare = async (id: string, status: boolean) => {
-    try {
-      await shivaiDrive.shareFile(id, status);
-      fetchFiles(activeTab);
-      alert(status ? 'Neural link shared.' : 'Neural link revoked.');
-    } catch (err: any) {
-      alert(`Sharing failed: ${err.message}`);
+    const file = files.find(f => f.id === id);
+    if (file) {
+      setSelectedFile(file);
+      setIsShareOpen(true);
     }
   };
 
@@ -184,7 +194,7 @@ export default function Home() {
       await shivaiDrive.deepScan();
       fetchFiles(activeTab);
       if (user) fetchStats(user.id);
-      alert('Deep scan initiated. Neural patterns are being indexed.');
+      alert('Neural processing initialized. This may take a moment.');
     } catch (err: any) {
       alert(`Scan failed: ${err.message}`);
     } finally {
@@ -192,25 +202,20 @@ export default function Home() {
     }
   };
 
-  const handleGenerateWorkspace = async () => {
-    setLoading(true);
-    try {
-      const config = await shivaiDrive.generateProjectWorkspace('root'); 
-      setProject(config);
-      alert('Workspace intelligence initialized.');
-    } catch (err: any) {
-      console.error(err);
-      alert(`Generation failed: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setLoading(false);
-    }
+  const handleUpgrade = () => {
+    setIsUpgradeOpen(true);
   };
 
   if (!user && !loading) return <UnauthorizedState />;
 
   return (
     <main className="flex min-h-screen bg-[#050505]">
-      <Sidebar active={activeTab} onChange={setActiveTab} />
+      <Sidebar 
+        active={activeTab} 
+        onChange={setActiveTab} 
+        stats={stats} 
+        onUpgrade={handleUpgrade}
+      />
       
       <div className="flex-1 ml-72">
         <TopBar 
@@ -235,10 +240,11 @@ export default function Home() {
                      activeTab === 'neural' ? 'Neural Index' : 
                      activeTab === 'vault' ? 'Secure Vault' : 
                      activeTab === 'trash' ? 'Neural Waste' :
-                     activeTab === 'shared' ? 'Shared Intelligence' : activeTab}
+                     activeTab === 'shared' ? 'Shared Intelligence' :
+                     activeTab === 'settings' ? 'Core Settings' : activeTab}
                  </h2>
                  <p className="text-xs font-bold text-gray-500 uppercase tracking-[0.3em]">
-                    {files.length} Intelligent Assets • Memory Health: Optimal
+                    {files.length} Intelligent Assets • Tier: {stats.tier}
                  </p>
               </div>
            </div>
@@ -247,6 +253,8 @@ export default function Home() {
              <NeuralExplorer stats={stats} insights={insights} onRefresh={handleDeepScan} />
            ) : activeTab === 'projects' ? (
              <ProjectDashboard project={project} onGenerate={handleGenerateWorkspace} />
+           ) : activeTab === 'settings' ? (
+             <SettingsView />
            ) : (
              <FileGrid 
                 files={files} 
@@ -259,6 +267,9 @@ export default function Home() {
            )}
         </div>
       </div>
+
+      <UpgradeModal isOpen={isUpgradeOpen} onClose={() => setIsUpgradeOpen(false)} />
+      <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} file={selectedFile} />
 
       {/* Neural Ambience */}
       <div className="fixed inset-0 pointer-events-none opacity-20 z-0">

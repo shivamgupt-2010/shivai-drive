@@ -74,6 +74,43 @@ export class ShivAIDriveSDK {
     return data as ShivAIProfile;
   }
 
+  // SUBSCRIPTION & STORAGE
+  async getStorageUsage(): Promise<{ used: number, limit: number, tier: string }> {
+    const user = await this.getCurrentUser();
+    if (!user) return { used: 0, limit: 5368709120, tier: 'Free' };
+
+    const { data: usage } = await this.supabase.rpc('get_user_storage_usage', { p_user_id: user.id });
+    const { data: sub } = await this.supabase.from('user_subscriptions').select('*').eq('user_id', user.id).single();
+
+    return {
+      used: usage || 0,
+      limit: sub?.storage_limit || 5368709120,
+      tier: sub?.tier || 'Free'
+    };
+  }
+
+  // SHARING
+  async shareWithEmail(fileId: string, email: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('file_shares')
+      .insert({ file_id: fileId, shared_with_email: email });
+    if (error) throw error;
+  }
+
+  // PRIVACY SETTINGS
+  async getPrivacySettings(): Promise<any> {
+    const user = await this.getCurrentUser();
+    if (!user) return null;
+    const { data } = await this.supabase.from('user_privacy_settings').select('*').eq('user_id', user.id).single();
+    return data;
+  }
+
+  async updatePrivacySettings(settings: any): Promise<void> {
+    const user = await this.getCurrentUser();
+    if (!user) return;
+    await this.supabase.from('user_privacy_settings').upsert({ user_id: user.id, ...settings });
+  }
+
   // STORAGE CORE
   async uploadFile(file: File, folderId?: string): Promise<DriveFile | null> {
     const user = await this.getCurrentUser();
